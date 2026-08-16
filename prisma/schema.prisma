@@ -1,0 +1,1070 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// SINGLE-USER AUTH
+// ─────────────────────────────────────────────
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  name        String
+  password    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+
+  profile           PersonalProfile?
+  projects          Project[]
+  auditLogs         AuditLog[]
+  measurementSheets MeasurementSheet[]
+  boqs              BOQ[]
+  reports           Report[]
+  revisions         EstimateRevision[]
+  rateAnalyses      RateAnalysis[]
+  rateAnalysisProjects RateAnalysisProject[]
+  importBatches     ImportBatch[]
+  kbItems           KnowledgeBaseItem[]
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// PERSONAL PROFILE
+// ─────────────────────────────────────────────
+
+model PersonalProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  firmName         String   @default("")
+  engineerName     String   @default("")
+  designation      String   @default("")
+  address          String   @default("")
+  city             String   @default("")
+  state            String   @default("Gujarat")
+  pincode          String   @default("")
+  phone            String   @default("")
+  email            String   @default("")
+  gst              String   @default("")
+  registrationNo   String   @default("")
+  logoPath         String?
+  stampPath        String?
+  signaturePath    String?
+  defaultDistrict  String   @default("Ahmedabad")
+  defaultSORYear   String   @default("2024-25")
+  boqHeaderNote    String   @default("")
+  boqFooterNote    String   @default("")
+  dtpHeaderHtml    String   @default("")
+  dtpFooterHtml    String   @default("")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("personal_profiles")
+}
+
+// ─────────────────────────────────────────────
+// DTP TEMPLATES
+// ─────────────────────────────────────────────
+
+enum DTPSectionType {
+  COVER
+  INDEX
+  PROJECT_INFO
+  BOQ
+  ABSTRACT
+  SPECIFICATIONS
+  NOTES
+  QUANTITY_SUMMARY
+  RATE_ANALYSIS_SUMMARY
+  SIGNATURES
+  CUSTOM
+}
+
+model DTPTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sections DTPSection[]
+
+  @@map("dtp_templates")
+}
+
+model DTPSection {
+  id          String         @id @default(cuid())
+  templateId  String
+  title       String
+  type        DTPSectionType
+  content     String         @db.Text
+  sortOrder   Int            @default(0)
+  isVisible   Boolean        @default(true)
+  pageBreak   Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  template DTPTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("dtp_sections")
+}
+
+// ─────────────────────────────────────────────
+// PROJECT
+// ─────────────────────────────────────────────
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+enum WorkType {
+  NEW_CONSTRUCTION
+  RENOVATION
+  REPAIR
+  MAINTENANCE
+  DEMOLITION
+  SURVEY
+}
+
+enum BuildingType {
+  RESIDENTIAL
+  COMMERCIAL
+  INDUSTRIAL
+  INSTITUTIONAL
+  INFRASTRUCTURE
+  MIXED_USE
+  CUSTOM
+}
+
+model Project {
+  id             String        @id @default(cuid())
+  projectNo      String        @unique
+  name           String
+  sorDivision    String        @default("")
+  state          String        @default("Gujarat")
+  sorYear        String        @default("2024-25")
+  status         ProjectStatus @default(DRAFT)
+  estimatedValue Decimal?      @db.Decimal(18, 2)
+  createdById    String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  drawingTemplate   String?
+
+  createdBy         User                @relation(fields: [createdById], references: [id])
+  measurementSheets MeasurementSheet[]
+  boqs              BOQ[]
+  reports           Report[]
+  auditLogs         AuditLog[]
+  elements          ProjectElement[]
+  revisions         EstimateRevision[]
+  validationIssues  ValidationIssue[]
+  kbItems           KnowledgeBaseItem[]
+  drawings          Drawing[]
+  projectEntities   ProjectEntity[]
+
+  @@map("projects")
+}
+
+// ─────────────────────────────────────────────
+// SOR (SCHEDULE OF RATES)
+// ─────────────────────────────────────────────
+
+model SORItem {
+  id            String    @id @default(cuid())
+  itemCode      String
+  description   String
+  unit          String
+  rate          Decimal   @db.Decimal(12, 2)
+  division      String
+  sorYear       String
+  chapter       String
+  subChapter          String?
+  category            String?
+  specification       String?
+  cementConsumption   Decimal?  @db.Decimal(10, 3)
+  steelConsumption    Decimal?  @db.Decimal(10, 3)
+  sandRatio           Decimal?  @db.Decimal(10, 6)
+  aggregateRatio      Decimal?  @db.Decimal(10, 6)
+  materialDescription String?
+  inputRate           Decimal?  @db.Decimal(12, 2)
+  qtyPerTrip          Decimal?  @db.Decimal(10, 3)
+  sortOrder           Int       @default(0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  rateHistory   RateHistory[]
+  boqItems      BOQItem[]
+  elementItems  ElementItem[]
+  assemblyItems ElementAssemblyItem[]
+  rateAnalyses  RateAnalysis[]
+
+  @@unique([itemCode, division, sorYear])
+  @@map("sor_items")
+}
+
+model BasicMaterialRate {
+  id           String   @id @default(cuid())
+  division     String
+  sorYear      String
+  materialCode String
+  materialName String
+  rate         Decimal  @db.Decimal(12, 2)
+  unit         String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([division, sorYear, materialCode])
+  @@map("basic_material_rates")
+}
+
+model RateHistory {
+  id          String   @id @default(cuid())
+  sorItemId   String
+  oldRate     Decimal  @db.Decimal(12, 2)
+  newRate     Decimal  @db.Decimal(12, 2)
+  changedAt   DateTime @default(now())
+  reason      String?
+  changedById String?
+
+  sorItem SORItem @relation(fields: [sorItemId], references: [id])
+
+  @@map("rate_history")
+}
+
+// ─────────────────────────────────────────────
+// ELEMENT ENGINE
+// ─────────────────────────────────────────────
+
+enum ElementType {
+  SUBSTRUCTURE
+  SUPERSTRUCTURE
+  FINISHING
+  EXTERNAL_WORKS
+  SERVICES
+  ROADS
+  DRAINAGE
+}
+
+model ElementTemplate {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  type        ElementType
+  description String?
+  icon        String?
+  isSystem    Boolean     @default(true)
+  // Auto-cascade: JSON array of sub-items to auto-generate when this element is added
+  // [{description, unit, formulaExpr, sorChapter, notes, sortOrder}]
+  autoItems   Json        @default("[]")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items           ElementItem[]
+  projectElements ProjectElement[]
+  assemblies      ElementAssembly[]
+
+  @@map("element_templates")
+}
+
+model ElementItem {
+  id                String   @id @default(cuid())
+  elementTemplateId String
+  sorItemId         String?
+  description       String
+  unit              String
+  formulaType       String
+  defaultFormula    String?
+  sortOrder         Int      @default(0)
+  isRequired        Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  elementTemplate ElementTemplate @relation(fields: [elementTemplateId], references: [id])
+  sorItem         SORItem?        @relation(fields: [sorItemId], references: [id])
+
+  @@map("element_items")
+}
+
+model ProjectElement {
+  id                String   @id @default(cuid())
+  projectId         String
+  elementTemplateId String
+  label             String
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  project         Project         @relation(fields: [projectId], references: [id])
+  elementTemplate ElementTemplate @relation(fields: [elementTemplateId], references: [id])
+  measurementRows MeasurementRow[]
+
+  @@map("project_elements")
+}
+
+// ─────────────────────────────────────────────
+// FORMULA ENGINE
+// ─────────────────────────────────────────────
+
+enum FormulaType {
+  VOLUME
+  AREA
+  LENGTH
+  WEIGHT
+  COUNT
+  CUSTOM
+}
+
+model Formula {
+  id          String      @id @default(cuid())
+  name        String
+  expression  String
+  variables   Json
+  type        FormulaType
+  unit        String?
+  description String?
+  example     String?
+  isSystem    Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
+
+  measurementRows MeasurementRow[]
+
+  @@map("formulas")
+}
+
+// ─────────────────────────────────────────────
+// MEASUREMENT SHEET
+// ─────────────────────────────────────────────
+
+enum MeasurementSheetStatus {
+  DRAFT
+  REVIEWED
+  APPROVED
+  LOCKED
+}
+
+model MeasurementSheet {
+  id           String                 @id @default(cuid())
+  projectId    String
+  name         String
+  description  String?
+  status       MeasurementSheetStatus @default(DRAFT)
+  version      Int                    @default(1)
+  createdById  String
+  reviewedById String?
+  approvedById String?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  deletedAt    DateTime?
+
+  project   Project          @relation(fields: [projectId], references: [id])
+  createdBy User             @relation(fields: [createdById], references: [id])
+  rows      MeasurementRow[]
+  boqs      BOQ[]
+
+  @@map("measurement_sheets")
+}
+
+model MeasurementRow {
+  id                 String   @id @default(cuid())
+  measurementSheetId String
+  projectElementId   String?
+  sorItemId          String?
+  formulaId          String?
+  itemNo             Int      @default(1)
+  gsrtcCode          String?
+  serialNo           Int
+  description        String
+  nos                Decimal? @db.Decimal(10, 3)
+  length             Decimal? @db.Decimal(10, 3)
+  breadth            Decimal? @db.Decimal(10, 3)
+  height             Decimal? @db.Decimal(10, 3)
+  quantity           Decimal  @db.Decimal(14, 4)
+  unit               String
+  formulaExpr        String?
+  isManualOverride   Boolean  @default(false)
+  remarks            String?
+  groupLabel         String?
+  isHeader           Boolean  @default(false)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  measurementSheet MeasurementSheet @relation(fields: [measurementSheetId], references: [id])
+  projectElement   ProjectElement?  @relation(fields: [projectElementId], references: [id])
+  formula          Formula?         @relation(fields: [formulaId], references: [id])
+  boqItems         BOQItem[]
+
+  @@map("measurement_rows")
+}
+
+// ─────────────────────────────────────────────
+// BOQ
+// ─────────────────────────────────────────────
+
+enum BOQStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  LOCKED
+  REVISED
+}
+
+enum BOQItemType {
+  STANDARD
+  LUMP_SUM
+  PROVISIONAL
+  PERCENTAGE
+  CONTINGENCY
+}
+
+enum SurchargeType {
+  GST
+  AGENCY_CHARGES
+  ESCALATION
+  CONTINGENCY
+  ROUND_OFF
+  CUSTOM
+}
+
+model BOQ {
+  id                 String    @id @default(cuid())
+  projectId          String
+  measurementSheetId String?
+  boqNo              String
+  name               String
+  subWork            String    @default("Civil")
+  status             BOQStatus @default(DRAFT)
+  revisionNo         Int       @default(1)
+  includeGST         Boolean   @default(false)
+  gstPercent         Decimal?  @db.Decimal(5, 2)
+  totalAmount        Decimal   @db.Decimal(18, 2) @default(0)
+  gstAmount          Decimal   @db.Decimal(18, 2) @default(0)
+  grandTotal         Decimal   @db.Decimal(18, 2) @default(0)
+  notes              String?
+  breakdown          Json?
+  lockedAt           DateTime?
+  approvedAt         DateTime?
+  createdById        String
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  project          Project           @relation(fields: [projectId], references: [id])
+  measurementSheet MeasurementSheet? @relation(fields: [measurementSheetId], references: [id])
+  createdBy        User              @relation(fields: [createdById], references: [id])
+  items            BOQItem[]
+  reports          Report[]
+  surcharges       BOQSurcharge[]
+  revisions        EstimateRevision[]
+  rateAnalyses     RateAnalysis[]
+  validationIssues ValidationIssue[]
+
+  @@map("boqs")
+}
+
+model BOQItem {
+  id               String      @id @default(cuid())
+  boqId            String
+  measurementRowId String?
+  sorItemId        String?
+  itemCode         String?
+  gsrtcCode        String?
+  description      String
+  unit             String
+  quantity         Decimal     @db.Decimal(14, 4)
+  rate             Decimal     @db.Decimal(12, 2)
+  amount           Decimal     @db.Decimal(18, 2)
+  sheetQtys        Json?
+  chapter          String?
+  elementLabel     String?
+  isManualEntry    Boolean     @default(false)
+  isOverridden     Boolean     @default(false)
+  sortOrder        Int         @default(0)
+  remarks          String?
+  itemType         BOQItemType @default(STANDARD)
+  isHidden         Boolean     @default(false)
+  isOptional       Boolean     @default(false)
+  isProvisional    Boolean     @default(false)
+  groupHeader      String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  boq            BOQ             @relation(fields: [boqId], references: [id])
+  measurementRow MeasurementRow? @relation(fields: [measurementRowId], references: [id])
+  sorItem        SORItem?        @relation(fields: [sorItemId], references: [id])
+  rateAnalysis   RateAnalysis?
+
+  @@map("boq_items")
+}
+
+model BOQSurcharge {
+  id        String        @id @default(cuid())
+  boqId     String
+  type      SurchargeType
+  label     String
+  percent   Decimal?      @db.Decimal(6, 3)
+  amount    Decimal?      @db.Decimal(18, 2)
+  isPercent Boolean       @default(true)
+  applyOn   String        @default("grandTotal")
+  sortOrder Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  boq BOQ @relation(fields: [boqId], references: [id])
+
+  @@map("boq_surcharges")
+}
+
+// ─────────────────────────────────────────────
+// ABSTRACT
+// ─────────────────────────────────────────────
+
+model Abstract {
+  id           String   @id @default(cuid())
+  boqId        String   @unique
+  chapterWise  Json
+  elementWise  Json
+  workTypeWise Json
+  grandTotal   Decimal  @db.Decimal(18, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("abstracts")
+}
+
+// ─────────────────────────────────────────────
+// PROJECT TEMPLATES
+// ─────────────────────────────────────────────
+
+enum TemplateType {
+  RESIDENTIAL_BUILDING
+  COMMERCIAL_BUILDING
+  SCHOOL_BUILDING
+  GOVERNMENT_OFFICE
+  HOSPITAL
+  BUS_STATION
+  GSRTC_BUS_STATION
+  COMPOUND_WALL
+  ROAD_WORK
+  DRAINAGE_WORK
+  BRIDGE
+  TOILET_BLOCK
+  WATER_TANK
+  RAINWATER_HARVESTING
+  BOUNDARY_WALL
+  INDUSTRIAL_SHED
+  CUSTOM
+}
+
+model Template {
+  id          String       @id @default(cuid())
+  name        String
+  type        TemplateType @default(CUSTOM)
+  description String?
+  elements    Json
+  boqItems    Json
+  formulas    Json
+  isSystem    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+
+  @@map("templates")
+}
+
+// ─────────────────────────────────────────────
+// REPORTS
+// ─────────────────────────────────────────────
+
+enum ReportType {
+  PROJECT_SUMMARY
+  MEASUREMENT_SHEET
+  BOQ
+  ABSTRACT
+  RATE_ANALYSIS
+  DTP
+}
+
+enum ReportFormat {
+  PDF
+  EXCEL
+  CSV
+}
+
+model Report {
+  id            String       @id @default(cuid())
+  projectId     String
+  boqId         String?
+  type          ReportType
+  format        ReportFormat
+  name          String
+  filePath      String?
+  fileSize      Int?
+  generatedById String
+  createdAt     DateTime     @default(now())
+
+  project     Project      @relation(fields: [projectId], references: [id])
+  boq         BOQ?         @relation(fields: [boqId], references: [id])
+  generatedBy User         @relation(fields: [generatedById], references: [id])
+
+  @@map("reports")
+}
+
+// ─────────────────────────────────────────────
+// AUDIT LOG
+// ─────────────────────────────────────────────
+
+enum AuditAction {
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_DELETED
+  MEASUREMENT_ADDED
+  MEASUREMENT_UPDATED
+  MEASUREMENT_DELETED
+  BOQ_GENERATED
+  BOQ_APPROVED
+  BOQ_LOCKED
+  BOQ_REVISED
+  RATE_CHANGED
+  REPORT_EXPORTED
+  USER_LOGIN
+  USER_LOGOUT
+  PROFILE_UPDATED
+  SOR_IMPORTED
+  ELEMENT_ADDED
+  ELEMENT_REMOVED
+  REVISION_CREATED
+  REVISION_APPROVED
+  RATE_ANALYSIS_SAVED
+  IMPORT_COMPLETED
+  VALIDATION_FAILED
+  ASSEMBLY_CREATED
+  WIZARD_COMPLETED
+  KB_ITEM_ADDED
+  SURCHARGE_UPDATED
+  DTP_GENERATED
+  DRAWING_UPLOADED
+  DRAWING_ANALYZED
+  ENTITY_VERIFIED
+  ENTITY_REJECTED
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  userId      String
+  projectId   String?
+  action      AuditAction
+  entity      String
+  entityId    String
+  oldValues   Json?
+  newValues   Json?
+  ipAddress   String?
+  userAgent   String?
+  description String?
+  createdAt   DateTime    @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// V2 MODULES
+// ═══════════════════════════════════════════════════════════════
+
+model WizardTemplate {
+  id            String       @id @default(cuid())
+  name          String       @unique
+  buildingType  BuildingType @default(CUSTOM)
+  workType      WorkType     @default(NEW_CONSTRUCTION)
+  description   String?
+  elementConfig Json         @default("[]")
+  parameters    Json         @default("[]")
+  // BOQ items with formulas: [{description, unit, sorCode, chapter, groupHeader, formula, sortOrder}]
+  boqItemFormulas Json       @default("[]")
+  assumptions   Json?
+  measurementPresets Json    @default("[]")
+  icon          String?
+  isActive      Boolean      @default(true)
+  isUserCreated Boolean      @default(false)
+  usageCount    Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("wizard_templates")
+}
+
+model ElementAssembly {
+  id                String    @id @default(cuid())
+  name              String
+  elementTemplateId String
+  description       String?
+  dimensionInputs   Json
+  isSystem          Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  elementTemplate ElementTemplate       @relation(fields: [elementTemplateId], references: [id])
+  items           ElementAssemblyItem[]
+
+  @@map("element_assemblies")
+}
+
+model ElementAssemblyItem {
+  id              String   @id @default(cuid())
+  assemblyId      String
+  sorItemId       String?
+  description     String
+  unit            String
+  formula         String
+  calculationNote String?
+  isRequired      Boolean  @default(true)
+  sequenceOrder   Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  assembly ElementAssembly @relation(fields: [assemblyId], references: [id])
+  sorItem  SORItem?        @relation(fields: [sorItemId], references: [id])
+
+  @@map("element_assembly_items")
+}
+
+enum RevisionStatus {
+  DRAFT
+  ACTIVE
+  LOCKED
+  SUPERSEDED
+}
+
+model EstimateRevision {
+  id            String         @id @default(cuid())
+  projectId     String
+  boqId         String
+  revisionNo    Int
+  name          String
+  status        RevisionStatus @default(DRAFT)
+  snapshot      Json
+  changeSummary String?
+  diff          Json?
+  compareBoqId  String?
+  createdById   String
+  lockedById    String?
+  lockedAt      DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id])
+  boq       BOQ     @relation(fields: [boqId], references: [id])
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  @@unique([projectId, revisionNo])
+  @@map("estimate_revisions")
+}
+
+enum RateComponentType {
+  MATERIAL
+  LABOUR
+  MACHINERY
+  TRANSPORT
+  OVERHEAD
+  PROFIT
+  TAX
+  OTHER
+}
+
+model RateAnalysis {
+  id           String    @id @default(cuid())
+  boqId        String?
+  boqItemId    String?   @unique
+  sorItemId    String?
+  name         String
+  unit         String
+  totalRate    Decimal   @db.Decimal(12, 2) @default(0)
+  isTemplate   Boolean   @default(false)
+  templateName String?
+  notes        String?
+  createdById  String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  boq        BOQ?                    @relation(fields: [boqId], references: [id])
+  boqItem    BOQItem?                @relation(fields: [boqItemId], references: [id])
+  sorItem    SORItem?                @relation(fields: [sorItemId], references: [id])
+  createdBy  User                    @relation(fields: [createdById], references: [id])
+  components RateAnalysisComponent[]
+
+  @@map("rate_analyses")
+}
+
+// ─────────────────────────────────────────────
+// RATE ANALYSIS PROJECT
+// ─────────────────────────────────────────────
+
+model RateAnalysisProject {
+  id             String   @id @default(cuid())
+  projectName    String
+  agencyName     String
+  items          Json     @default("[]")
+  globalSettings Json     @default("{}")
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  createdBy User @relation(fields: [createdById], references: [id])
+  
+  @@map("rate_analysis_projects")
+}
+
+// ─────────────────────────────────────────────
+// ITEM SPECIFICATIONS (Civil Department SOR)
+// ─────────────────────────────────────────────
+
+model ItemSpecification {
+  id          String   @id @default(cuid())
+  itemCode    String   @unique
+  description String   @db.Text
+  sections    Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("item_specifications")
+}
+
+model RateAnalysisComponent {
+  id             String            @id @default(cuid())
+  rateAnalysisId String
+  type           RateComponentType
+  description    String
+  unit           String?
+  quantity       Decimal           @db.Decimal(12, 4) @default(1)
+  rate           Decimal           @db.Decimal(12, 2)
+  amount         Decimal           @db.Decimal(14, 2)
+  sortOrder      Int               @default(0)
+  createdAt      DateTime          @default(now())
+
+  rateAnalysis RateAnalysis @relation(fields: [rateAnalysisId], references: [id])
+
+  @@map("rate_analysis_components")
+}
+
+enum KBItemType {
+  SPECIFICATION
+  NOTE
+  REFERENCE
+  FORMULA_GUIDE
+  REGULATION
+}
+
+model KnowledgeBaseItem {
+  id          String     @id @default(cuid())
+  title       String
+  content     String     @db.Text
+  type        KBItemType @default(NOTE)
+  tags        Json       @default("[]")
+  projectId   String?
+  chapter     String?
+  sorYear     String?
+  isGlobal    Boolean    @default(true)
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?
+
+  project   Project? @relation(fields: [projectId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@map("knowledge_base_items")
+}
+
+enum ValidationSeverity {
+  ERROR
+  WARNING
+  INFO
+}
+
+model ValidationIssue {
+  id         String             @id @default(cuid())
+  boqId      String
+  projectId  String?
+  boqItemId  String?
+  severity   ValidationSeverity
+  code       String
+  message    String
+  field      String?
+  context    Json?
+  isResolved Boolean            @default(false)
+  resolvedAt DateTime?
+  createdAt  DateTime           @default(now())
+
+  boq     BOQ      @relation(fields: [boqId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@map("validation_issues")
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model ImportBatch {
+  id          String       @id @default(cuid())
+  fileName    String
+  fileType    String
+  targetType  String
+  targetId    String?
+  status      ImportStatus @default(PENDING)
+  totalRows   Int          @default(0)
+  successRows Int          @default(0)
+  failedRows  Int          @default(0)
+  duplicates  Int          @default(0)
+  columnMap   Json?
+  createdById String
+  completedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  createdBy User          @relation(fields: [createdById], references: [id])
+  errors    ImportError[]
+
+  @@map("import_batches")
+}
+
+model ImportError {
+  id            String      @id @default(cuid())
+  importBatchId String
+  rowNumber     Int
+  rowData       Json
+  errorMessage  String
+  field         String?
+  createdAt     DateTime    @default(now())
+
+  importBatch ImportBatch @relation(fields: [importBatchId], references: [id])
+
+  @@map("import_errors")
+}
+
+// ─────────────────────────────────────────────
+// DRAWING INTELLIGENCE
+// ─────────────────────────────────────────────
+
+enum DrawingDiscipline {
+  ARCHITECTURAL
+  STRUCTURAL
+  ELECTRICAL
+  PLUMBING
+  OTHER
+}
+
+enum DrawingStatus {
+  UPLOADED
+  ANALYZING
+  ANALYZED
+  ERROR
+}
+
+enum EntityStatus {
+  NEEDS_VERIFICATION
+  VERIFIED
+  REJECTED
+  CONFLICT
+  NOT_FOUND
+}
+
+model Drawing {
+  id            String            @id @default(cuid())
+  projectId     String
+  name          String
+  drawingNo     String?
+  discipline    DrawingDiscipline @default(ARCHITECTURAL)
+  floor         String?
+  revision      String?
+  fileName      String
+  filePath      String
+  fileType      String
+  fileSize      Int               @default(0)
+  pageCount     Int               @default(1)
+  status        DrawingStatus     @default(UPLOADED)
+  analysisError String?
+  uploadedAt    DateTime          @default(now())
+  analyzedAt    DateTime?
+
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pages    DrawingPage[]
+  entities ProjectEntity[]
+
+  @@index([projectId])
+  @@map("drawings")
+}
+
+model DrawingPage {
+  id          String  @id @default(cuid())
+  drawingId   String
+  pageNo      Int
+  textContent String? @db.Text
+  imageUrl    String?
+
+  drawing  Drawing         @relation(fields: [drawingId], references: [id], onDelete: Cascade)
+  entities ProjectEntity[]
+
+  @@unique([drawingId, pageNo])
+  @@map("drawing_pages")
+}
+
+model ProjectEntity {
+  id               String       @id @default(cuid())
+  projectId        String
+  drawingId        String?
+  pageId           String?
+  entityType       String
+  entityLabel      String?
+  attributes       Json
+  extractionMethod String       @default("MANUAL")
+  confidence       Float?
+  status           EntityStatus @default(NEEDS_VERIFICATION)
+  notes            String?
+  verifiedAt       DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  drawing Drawing?     @relation(fields: [drawingId], references: [id])
+  page    DrawingPage? @relation(fields: [pageId], references: [id])
+
+  @@index([projectId, entityType])
+  @@map("project_entities")
+}
+
+model AISettings {
+  id                String   @id @default("singleton")
+  provider          String   @default("ollama")
+  ollamaUrl         String   @default("http://localhost:11434")
+  ollamaModel       String   @default("qwen2.5:7b")
+  ollamaVisionModel String   @default("qwen2.5:7b")
+  ollamaTimeout     Int      @default(300)
+  updatedAt         DateTime @updatedAt
+
+  @@map("ai_settings")
+}

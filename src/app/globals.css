@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
+}
+
+/* Professional table styles */
+.boq-table {
+  @apply w-full text-sm border-collapse;
+}
+.boq-table th {
+  @apply bg-slate-50 text-slate-700 font-semibold px-3 py-2 text-left border border-slate-200 text-xs uppercase tracking-wide;
+}
+.boq-table td {
+  @apply px-3 py-2 border border-slate-200 text-slate-800;
+}
+.boq-table tr:hover td {
+  @apply bg-blue-50/40;
+}
+.boq-table tr.header-row td {
+  @apply bg-slate-100 font-semibold text-slate-700;
+}
+
+/* Measurement sheet cell styles */
+.ms-cell {
+  @apply border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 bg-white;
+}
+.ms-cell.number {
+  @apply text-right font-mono;
+}
+.ms-cell.computed {
+  @apply bg-slate-50 text-slate-600 cursor-default;
+}
+
+/* Sidebar nav */
+.sidebar-link {
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors text-sm font-medium;
+}
+.sidebar-link.active {
+  @apply bg-blue-600 text-white hover:bg-blue-700 hover:text-white;
+}
+.sidebar-link-group {
+  @apply text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 pt-4 pb-1;
+}
+
+/* Status badges */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+/* Card hover */
+.card-hover {
+  @apply transition-shadow duration-200 hover:shadow-md;
+}
+
+/* Print styles */
+@media print {
+  .no-print { display: none !important; }
+  .print-full { width: 100% !important; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { @apply bg-slate-100; }
+::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-slate-400; }
